@@ -95,7 +95,7 @@ class _HomePageState extends State<HomePage> {
         _syncTask,
         frequency: const Duration(minutes: 15),
         constraints: Constraints(networkType: NetworkType.connected),
-        existingWorkPolicy: ExistingWorkPolicy.replace,
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
       );
       final result = await LocationSyncService.syncOnce(source: 'manual-start');
       setState(() => status = result);
