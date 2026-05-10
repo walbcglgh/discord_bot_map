@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -103,9 +104,9 @@ class _HomePageState extends State<HomePage> {
     setState(() { busy = true; status = '正在要求定位權限'; });
     try {
       await _save(enabled: true);
-      final ok = await LocationSyncService.ensurePermission();
+      final ok = await LocationSyncService.ensurePermission(requireBackground: true);
       if (!ok) {
-        setState(() => status = '定位權限不足，請到系統設定允許定位');
+        setState(() => status = '背景定位權限不足，請到系統設定允許「一律允許」');
         return;
       }
       await Workmanager().cancelByUniqueName(_syncTask);
@@ -182,7 +183,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class LocationSyncService {
-  static Future<bool> ensurePermission() async {
+  static Future<bool> ensurePermission({bool requireBackground = false}) async {
     var serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return false;
 
@@ -190,7 +191,24 @@ class LocationSyncService {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return false;
+    }
+    if (!requireBackground) {
+      return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+    }
+    if (permission == LocationPermission.always) return true;
+
+    final always = await ph.Permission.locationAlways.request();
+    if (always.isGranted) return true;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.always) return true;
+
+    if (always.isPermanentlyDenied || permission == LocationPermission.deniedForever) {
+      await ph.openAppSettings();
+    }
+    return false;
   }
 
   static Future<String> syncOnce({String source = 'manual'}) async {
