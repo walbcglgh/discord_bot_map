@@ -1,39 +1,58 @@
 ﻿workflows:
   android-debug:
     name: Android Debug APK
+    instance_type: mac_mini_m2
     max_build_duration: 30
     environment:
       flutter: stable
     scripts:
-      - flutter pub get
-      - flutter build apk --debug
+      - name: Prepare Flutter project
+        script: |
+          flutter create --platforms=android,ios .
+          flutter pub get
+      - name: Build debug APK
+        script: |
+          flutter build apk --debug
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
 
   android-release:
-    name: Android Release APK unsigned
+    name: Android Release APK
+    instance_type: mac_mini_m2
     max_build_duration: 30
     environment:
       flutter: stable
     scripts:
-      - flutter pub get
-      - flutter build apk --release
+      - name: Prepare Flutter project
+        script: |
+          flutter create --platforms=android,ios .
+          flutter pub get
+      - name: Build release APK
+        script: |
+          flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
 
   ios-unsigned:
-    name: iOS unsigned app bundle
+    name: iOS Unsigned IPA
     instance_type: mac_mini_m2
     max_build_duration: 30
     environment:
       flutter: stable
       xcode: latest
     scripts:
-      - flutter pub get
-      - flutter build ios --release --no-codesign
-      - cd build/ios/iphoneos
-      - mkdir -p Payload
-      - cp -R Runner.app Payload/Runner.app
-      - zip -r DC_Location_unsigned.ipa Payload
+      - name: Prepare Flutter project
+        script: |
+          flutter create --platforms=android,ios .
+          flutter pub get
+      - name: Build unsigned iOS app
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        script: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -R Runner.app Payload/Runner.app
+          zip -r DC_Location_unsigned.ipa Payload
     artifacts:
       - build/ios/iphoneos/DC_Location_unsigned.ipa
