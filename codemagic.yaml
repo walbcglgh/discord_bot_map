@@ -10,6 +10,9 @@
         script: |
           flutter create --platforms=android,ios .
           flutter pub get
+      - name: Patch Android permissions
+        script: |
+          python3 scripts/patch_platform_permissions.py
       - name: Build debug APK
         script: |
           flutter build apk --debug
@@ -27,6 +30,9 @@
         script: |
           flutter create --platforms=android,ios .
           flutter pub get
+      - name: Patch Android permissions
+        script: |
+          python3 scripts/patch_platform_permissions.py
       - name: Build release APK
         script: |
           flutter build apk --release
@@ -45,6 +51,9 @@
         script: |
           flutter create --platforms=android,ios .
           flutter pub get
+      - name: Patch iOS permissions
+        script: |
+          python3 scripts/patch_platform_permissions.py
       - name: Build unsigned iOS app
         script: |
           flutter build ios --release --no-codesign

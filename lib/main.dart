@@ -100,7 +100,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _start() async {
-    setState(() { busy = true; status = '正在確認定位權限'; });
+    setState(() { busy = true; status = '正在要求定位權限'; });
     try {
       await _save(enabled: true);
       final ok = await LocationSyncService.ensurePermission();
@@ -126,7 +126,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _syncNow() async {
-    setState(() { busy = true; status = '正在同步目前位置'; });
+    setState(() { busy = true; status = '正在要求定位權限並同步位置'; });
     try {
       await _save(enabled: true);
       final result = await LocationSyncService.syncOnce(source: 'manual');
