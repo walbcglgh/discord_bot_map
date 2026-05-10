@@ -1,6 +1,8 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +24,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
   runApp(const DCLocationApp());
+}
+
+String generateLocationCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  final random = Random.secure();
+  String part(int length) => List.generate(length, (_) => chars[random.nextInt(chars.length)]).join();
+  return 'DCL-${part(4)}-${part(4)}-${part(4)}-${part(4)}';
 }
 
 class DCLocationApp extends StatelessWidget {
@@ -50,9 +59,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final endpoint = TextEditingController();
-  final token = TextEditingController();
-  final guildId = TextEditingController();
-  final userId = TextEditingController();
+  final code = TextEditingController();
   String status = '尚未啟動';
   bool busy = false;
 
@@ -65,19 +72,33 @@ class _HomePageState extends State<HomePage> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     endpoint.text = prefs.getString('endpoint') ?? '';
-    token.text = prefs.getString('token') ?? '';
-    guildId.text = prefs.getString('guild_id') ?? '';
-    userId.text = prefs.getString('user_id') ?? '';
+    code.text = prefs.getString('code') ?? generateLocationCode();
+    await prefs.setString('code', code.text.trim());
     setState(() => status = prefs.getBool('enabled') == true ? '背景同步已啟用' : '尚未啟動');
   }
 
   Future<void> _save({bool enabled = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('endpoint', endpoint.text.trim());
-    await prefs.setString('token', token.text.trim());
-    await prefs.setString('guild_id', guildId.text.trim());
-    await prefs.setString('user_id', userId.text.trim());
+    await prefs.setString('code', code.text.trim().toUpperCase());
     await prefs.setBool('enabled', enabled);
+  }
+
+  Future<void> _copyCode() async {
+    await Clipboard.setData(ClipboardData(text: code.text.trim()));
+    setState(() => status = '通知碼已複製，請到 Discord 使用 /location_code 綁定。');
+  }
+
+  Future<void> _regenerateCode() async {
+    await Workmanager().cancelByUniqueName(_syncTask);
+    final prefs = await SharedPreferences.getInstance();
+    final next = generateLocationCode();
+    await prefs.setString('code', next);
+    await prefs.setBool('enabled', false);
+    setState(() {
+      code.text = next;
+      status = '已重新產生通知碼，請重新到 Discord 綁定。';
+    });
   }
 
   Future<void> _start() async {
@@ -134,9 +155,16 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(16),
         children: [
           TextField(controller: endpoint, decoration: const InputDecoration(labelText: 'API Endpoint', hintText: 'https://your-domain/api/location/update')),
-          TextField(controller: token, decoration: const InputDecoration(labelText: 'Token'), obscureText: true),
-          TextField(controller: guildId, decoration: const InputDecoration(labelText: 'Discord Guild ID'), keyboardType: TextInputType.number),
-          TextField(controller: userId, decoration: const InputDecoration(labelText: 'Discord User ID'), keyboardType: TextInputType.number),
+          const SizedBox(height: 12),
+          TextField(controller: code, readOnly: true, decoration: const InputDecoration(labelText: '通知碼')),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton(onPressed: busy ? null : _copyCode, child: const Text('複製通知碼'))),
+              const SizedBox(width: 8),
+              Expanded(child: OutlinedButton(onPressed: busy ? null : _regenerateCode, child: const Text('重新產生'))),
+            ],
+          ),
           const SizedBox(height: 20),
           FilledButton(onPressed: busy ? null : _start, child: const Text('儲存並啟動背景同步')),
           OutlinedButton(onPressed: busy ? null : _syncNow, child: const Text('手動同步一次')),
@@ -149,6 +177,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 12),
+          const Text('先複製通知碼，到 Discord 伺服器使用 /location_code 綁定，再回來同步。', style: TextStyle(color: Colors.grey)),
           const Text('iOS 背景更新由系統決定，通常不是即時；Android 也可能受省電策略影響。', style: TextStyle(color: Colors.grey)),
         ],
       ),
@@ -171,12 +200,10 @@ class LocationSyncService {
   static Future<String> syncOnce({String source = 'manual'}) async {
     final prefs = await SharedPreferences.getInstance();
     final endpoint = prefs.getString('endpoint') ?? '';
-    final token = prefs.getString('token') ?? '';
-    final guildId = prefs.getString('guild_id') ?? '';
-    final userId = prefs.getString('user_id') ?? '';
+    final code = prefs.getString('code') ?? '';
 
     if (!endpoint.startsWith('https://')) return '請先填 HTTPS API Endpoint';
-    if (token.isEmpty || guildId.isEmpty || userId.isEmpty) return '請先填 Token / Guild ID / User ID';
+    if (code.isEmpty) return '請先產生並綁定通知碼';
 
     final ok = await ensurePermission();
     if (!ok) return '定位權限不足';
@@ -187,9 +214,7 @@ class LocationSyncService {
     );
 
     final payload = {
-      'token': token,
-      'guild_id': guildId,
-      'user_id': userId,
+      'code': code,
       'lat': pos.latitude,
       'lon': pos.longitude,
       'accuracy': pos.accuracy,
