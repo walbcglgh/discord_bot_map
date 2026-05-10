@@ -29,13 +29,9 @@ flutter pub get
 /location_code action:綁定 code:你的通知碼
 ```
 
-4. 回到 App 填 API Endpoint，按「手動同步一次」或「儲存並啟動背景同步」。
+4. 回到 App 按「手動同步一次」或「儲存並啟動背景同步」。
 
-App endpoint：
-
-```text
-https://你的網域/api/location/update
-```
+API Endpoint 已寫在 App 程式碼內，不需要使用者手動填：`https://taiwandisasternews.dpdns.org/api/location/update`。
 
 ## Android 打包
 

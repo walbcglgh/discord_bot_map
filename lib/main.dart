@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 const _syncTask = 'dc_location_sync_task';
+const _apiEndpoint = 'https://taiwandisasternews.dpdns.org/api/location/update';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -58,7 +59,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final endpoint = TextEditingController();
   final code = TextEditingController();
   String status = '尚未啟動';
   bool busy = false;
@@ -71,7 +71,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    endpoint.text = prefs.getString('endpoint') ?? '';
     code.text = prefs.getString('code') ?? generateLocationCode();
     await prefs.setString('code', code.text.trim());
     setState(() => status = prefs.getBool('enabled') == true ? '背景同步已啟用' : '尚未啟動');
@@ -79,7 +78,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _save({bool enabled = false}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('endpoint', endpoint.text.trim());
     await prefs.setString('code', code.text.trim().toUpperCase());
     await prefs.setBool('enabled', enabled);
   }
@@ -154,8 +152,6 @@ class _HomePageState extends State<HomePage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(controller: endpoint, decoration: const InputDecoration(labelText: 'API Endpoint', hintText: 'https://your-domain/api/location/update')),
-          const SizedBox(height: 12),
           TextField(controller: code, readOnly: true, decoration: const InputDecoration(labelText: '通知碼')),
           const SizedBox(height: 8),
           Row(
@@ -199,10 +195,9 @@ class LocationSyncService {
 
   static Future<String> syncOnce({String source = 'manual'}) async {
     final prefs = await SharedPreferences.getInstance();
-    final endpoint = prefs.getString('endpoint') ?? '';
     final code = prefs.getString('code') ?? '';
 
-    if (!endpoint.startsWith('https://')) return '請先填 HTTPS API Endpoint';
+    if (!_apiEndpoint.startsWith('https://')) return 'App API Endpoint not configured';
     if (code.isEmpty) return '請先產生並綁定通知碼';
 
     final ok = await ensurePermission();
@@ -222,7 +217,7 @@ class LocationSyncService {
     };
 
     final res = await http.post(
-      Uri.parse(endpoint),
+      Uri.parse(_apiEndpoint),
       headers: {'Content-Type': 'application/json; charset=utf-8'},
       body: jsonEncode(payload),
     ).timeout(const Duration(seconds: 25));

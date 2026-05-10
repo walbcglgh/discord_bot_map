@@ -10,7 +10,7 @@
 
 ## App 端設定
 
-- API 位址：`https://你的網域/api/location/update`
+- API 位址已寫在 App 內：`https://taiwandisasternews.dpdns.org/api/location/update`
 - 通知碼：App 會自動產生，不需要手動填 Discord ID。
 
 ## Discord 綁定
