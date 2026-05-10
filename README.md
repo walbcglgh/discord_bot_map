@@ -4,7 +4,7 @@
 
 ## 第一次建立完整 Flutter 專案
 
-因為這台目前沒有 Flutter，所以這裡先放核心源碼。你安裝 Flutter 後在此資料夾執行：
+因為這台目前沒有完整 Android SDK，所以這裡主要交給 Codemagic build。若本機有 Flutter，可在此資料夾執行：
 
 ```bash
 flutter create --platforms=android,ios .
@@ -19,13 +19,17 @@ flutter pub get
 - `docs/IOS.md`
 - `docs/CODEMAGIC.md`
 
-## Bot 端設定
+## 使用流程
 
-`.env`：
+1. App 會自動產生一組通知碼。
+2. 複製通知碼。
+3. 到 Discord 伺服器使用：
 
-```env
-LOCATION_API_TOKEN=請換成很長的隨機字串
+```text
+/location_code action:綁定 code:你的通知碼
 ```
+
+4. 回到 App 填 API Endpoint，按「手動同步一次」或「儲存並啟動背景同步」。
 
 App endpoint：
 
@@ -53,19 +57,17 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ## API 行為
 
-App 會送出：
+App 只會送出通知碼與定位，不會送 Discord 使用者 ID 或伺服器 ID：
 
 ```json
 {
-  "token": "LOCATION_API_TOKEN",
-  "guild_id": "Discord 伺服器 ID",
-  "user_id": "Discord 使用者 ID",
+  "code": "DCL-ABCD-2345-EFGH-6789",
   "lat": 25.033,
   "lon": 121.565
 }
 ```
 
-Bot 收到後會依照內建鄉鎮市區資料把暱稱改成：
+Bot 收到後會依照通知碼查出綁定的 Discord 使用者，再把暱稱改成：
 
 ```text
 原本暱稱｜臺北市信義區
