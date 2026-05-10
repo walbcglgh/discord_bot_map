@@ -72,14 +72,18 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    code.text = prefs.getString('code') ?? generateLocationCode();
+    code.text = (prefs.getString('code') ?? generateLocationCode()).trim().toUpperCase();
     await prefs.setString('code', code.text.trim());
     setState(() => status = prefs.getBool('enabled') == true ? '背景同步已啟用' : '尚未啟動');
   }
 
   Future<void> _save({bool enabled = false}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('code', code.text.trim().toUpperCase());
+    if (code.text.trim().isEmpty) {
+      code.text = generateLocationCode();
+    }
+    code.text = code.text.trim().toUpperCase();
+    await prefs.setString('code', code.text);
     await prefs.setBool('enabled', enabled);
   }
 
@@ -110,6 +114,8 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       await Workmanager().cancelByUniqueName(_syncTask);
+      final suffix = code.text.trim().length >= 4 ? code.text.trim().substring(code.text.trim().length - 4) : '----';
+      setState(() => status = 'Syncing location (code suffix: $suffix)');
       await Workmanager().registerPeriodicTask(
         _syncTask,
         _syncTask,
@@ -117,7 +123,7 @@ class _HomePageState extends State<HomePage> {
         constraints: Constraints(networkType: NetworkType.connected),
         existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
       );
-      final result = await LocationSyncService.syncOnce(source: 'manual-start');
+      final result = await LocationSyncService.syncOnce(source: 'manual-start', overrideCode: code.text);
       setState(() => status = result);
     } catch (e) {
       setState(() => status = '啟動失敗：$e');
@@ -127,10 +133,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _syncNow() async {
-    setState(() { busy = true; status = '正在要求定位權限並同步位置'; });
+    setState(() { busy = true; status = 'Preparing location sync'; });
     try {
       await _save(enabled: true);
-      final result = await LocationSyncService.syncOnce(source: 'manual');
+      final manualSuffix = code.text.trim().length >= 4 ? code.text.trim().substring(code.text.trim().length - 4) : '----';
+      setState(() => status = 'Syncing location (code suffix: $manualSuffix)');
+      final result = await LocationSyncService.syncOnce(source: 'manual', overrideCode: code.text);
       setState(() => status = result);
     } catch (e) {
       setState(() => status = '同步失敗：$e');
@@ -211,12 +219,17 @@ class LocationSyncService {
     return false;
   }
 
-  static Future<String> syncOnce({String source = 'manual'}) async {
+  static Future<String> syncOnce({String source = 'manual', String? overrideCode}) async {
     final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString('code') ?? '';
+    var code = (overrideCode ?? prefs.getString('code') ?? '').trim().toUpperCase();
+    if (code.isEmpty) {
+      code = generateLocationCode();
+      await prefs.setString('code', code);
+      await prefs.setBool('enabled', false);
+      return '已重新產生通知碼，請先複製並到 Discord 綁定';
+    }
 
     if (!_apiEndpoint.startsWith('https://')) return 'App API Endpoint not configured';
-    if (code.isEmpty) return '請先產生並綁定通知碼';
 
     final ok = await ensurePermission();
     if (!ok) return '定位權限不足';
