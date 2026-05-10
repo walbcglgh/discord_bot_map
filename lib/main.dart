@@ -236,8 +236,8 @@ class LocationSyncService {
 
     final res = await http.post(
       Uri.parse(_apiEndpoint),
-      headers: {'Content-Type': 'application/json; charset=utf-8'},
-      body: jsonEncode(payload),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode(payload)),
     ).timeout(const Duration(seconds: 25));
 
     final body = utf8.decode(res.bodyBytes);
